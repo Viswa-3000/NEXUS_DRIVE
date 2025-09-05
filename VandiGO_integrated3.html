@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ride Booking System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --primary-dark: #155bb5;
+            --background-color: #f0f4f8; /* Softer, slightly bluish-grey */
+            --background-gradient-start: #e0eafc; /* Light blue start */
+            --background-gradient-end: #cfdef3; /* Slightly darker blue end */
+            --card-background: #ffffff;
+            --text-color: #333;
+            --light-text: #666;
+            --border-color: #e0e0e0;
+            --shadow-light: rgba(0, 0, 0, 0.05);
+            --shadow-medium: rgba(0, 0, 0, 0.1);
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+        }
+
+        /* --- Dark Mode Variables --- */
+        body.dark-mode {
+            --background-color: #1a202c;
+            --background-gradient-start: #2d3748;
+            --background-gradient-end: #1a202c;
+            --card-background: #2d3748;
+            --text-color: #e2e8f0; /* Slightly softer white */
+            --light-text: #a0aec0;
+            --border-color: #4a5568;
+            --shadow-light: rgba(0, 0, 0, 0.2);
+            --shadow-medium: rgba(0, 0, 0, 0.4);
+            --primary-color: #63b3ed; /* Lighter blue for better contrast */
+            --primary-dark: #4299e1;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--background-gradient-start), var(--background-gradient-end));
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: var(--text-color);
+            padding: 20px;
+            box-sizing: border-box;
+            transition: background 0.3s ease; /* Transition background property for smoother gradient change */
+        }
+        .container {
+            background-color: var(--card-background);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 12px 30px var(--shadow-medium);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: containerPopIn 0.5s ease-out forwards;
+        }
+        @keyframes containerPopIn {
+            from { opacity: 0; transform: scale(0.95) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 30px;
+            font-weight: 700;
+            font-size: 2.5rem;
+        }
+        h2 {
+            color: var(--text-color);
+            margin-bottom: 20px; /* Adjusted for consistency */
+            font-weight: 600;
+            font-size: 1.8rem;
+        }
+        .page {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        .page.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .back-btn {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            background: none;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            color: var(--light-text);
+            transition: color 0.2s, transform 0.2s;
+            line-height: 1;
+        }
+        .back-btn:hover {
+            color: var(--primary-color);
+            transform: translateX(-5px);
+        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .input-group label {
+            display: inline-block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--light-text);
+            font-size: 0.95rem;
+        }
+        input[type="text"], input[type="password"], input[type="tel"], select {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 1rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            background-color: #fcfcfc;
+        }
+        input[type="text"]:focus, input[type="password"]:focus, input[type="tel"]:focus, select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2);
+            outline: none;
+            background-color: var(--card-background);
+        }
+
+        /* Dark mode specific input styles */
+        body.dark-mode input[type="text"],
+        body.dark-mode input[type="password"],
+        body.dark-mode input[type="tel"],
+        body.dark-mode select {
+            background-color: #1a202c;
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+        body.dark-mode input::placeholder {
+            color: #718096;
+        }
+
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 700;
+            transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s;
+            box-shadow: 0 4px 10px var(--shadow-light);
+            letter-spacing: 0.5px;
+        }
+        .btn:disabled {
+            background-color: #dcdcdc;
+            color: #999;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .btn-primary:not(:disabled):hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px var(--shadow-medium);
+        }
+        .btn-secondary {
+            background-color: #e9e9e9;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+        .btn-success {
+            background-color: var(--success-color);
+            color: #fff;
+        }
+
+        body.dark-mode .btn-secondary {
+            background-color: #4a5568;
+            color: var(--text-color);
+        }
+
+        .btn-secondary:not(:disabled):hover {
+            background-color: #dcdcdc;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px var(--shadow-light);
+        }
+
+        body.dark-mode .btn-secondary:not(:disabled):hover {
+            background-color: #2d3748;
+        }
+
+        .message {
+            color: var(--danger-color);
+            font-size: 0.9rem;
+            margin-top: 10px;
+            min-height: 1rem; /* Prevent layout shift */
+            text-align: left;
+            font-weight: 600;
+        }
+        .info-section {
+            background-color: #f9fbfd;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 25px;
+            text-align: left;
+            border: 1px dashed var(--border-color);
+            box-shadow: inset 0 1px 5px var(--shadow-light);
+        }
+        body.dark-mode .info-section {
+            background-color: #1a202c;
+        }
+        .info-section p {
+            margin: 8px 0;
+            font-size: 1.1rem;
+            line-height: 1.4;
+        }
+        .info-section strong {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .clock {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--light-text);
+            background-color: #f0f4f8;
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+        body.dark-mode .clock {
+            background-color: #1a202c;
+        }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            text-align: left;
+        }
+        .dashboard-grid h3 {
+            text-align: center;
+            margin-bottom: 15px;
+            color: var(--light-text);
+            font-weight: 700;
+            font-size: 1.3rem;
+        }
+        .trip-list {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            min-height: 150px;
+            background-color: #fefefe;
+            box-shadow: inset 0 2px 5px var(--shadow-light);
+            overflow-y: auto;
+            max-height: 250px;
+        }
+        body.dark-mode .trip-list {
+            background-color: #1a202c;
+        }
+        .trip-item {
+            padding: 15px;
+            border: 1px solid #e9e9e9;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            background-color: var(--card-background);
+            transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
+            font-size: 0.95rem;
+        }
+        .trip-item:hover {
+            background-color: #f7f7f7;
+            box-shadow: 0 4px 12px var(--shadow-light);
+            transform: translateY(-2px);
+        }
+        body.dark-mode .trip-item:hover {
+            background-color: #4a5568;
+        }
+        .loading-animation {
+            border: 4px solid var(--border-color);
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .success-message {
+            color: var(--success-color);
+            font-weight: 600;
+            margin-top: 15px;
+        }
+        .car-icon {
+            width: 60px;
+            height: 60px;
+            margin-bottom: -10px;
+            color: var(--primary-color);
+        }
+        
+        /* --- Theme Switcher Styles --- */
+        .theme-switch-wrapper {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .theme-switch {
+            display: inline-block;
+            height: 24px;
+            position: relative;
+            width: 50px;
+        }
+        .theme-switch input {
+            display:none;
+        }
+        .slider {
+            background-color: #ccc;
+            bottom: 0;
+            cursor: pointer;
+            left: 0;
+            position: absolute;
+            right: 0;
+            top: 0;
+            transition: .4s;
+        }
+        .slider:before {
+            background-color: #fff;
+            bottom: 4px;
+            content: "";
+            height: 16px;
+            left: 4px;
+            position: absolute;
+            transition: .4s;
+            width: 16px;
+        }
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .slider.round {
+            border-radius: 34px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="theme-switch-wrapper">
+            <label class="theme-switch" for="theme-toggle">
+                <input type="checkbox" id="theme-toggle" onchange="toggleDarkMode()">
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <div id="login-page" class="page active">
+            <svg class="car-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"></path></svg>
+            <h1>Welcome</h1>
+            <p style="color:var(--light-text);">Please choose your role to log in:</p>
+            <button class="btn btn-primary" onclick="showPage('user-login-page')">User Login / Register</button>
+            <button class="btn btn-secondary" onclick="showPage('driver-login-page')">Driver Login</button>
+        </div>
+
+        <div id="user-login-page" class="page">
+            <button class="back-btn" onclick="showPage('login-page')">←</button>
+            <h2>User Login</h2>
+            <div class="input-group">
+                <label for="user-phone">Phone Number</label>
+                <input type="tel" id="user-phone" placeholder="Enter your phone number" required>
+            </div>
+            <div id="user-login-error" class="message"></div>
+            <button class="btn btn-primary" onclick="handleUserLogin(event)">Login</button>
+            <button class="btn btn-secondary" onclick="goToRegisterPage()">New User? Register</button>
+        </div>
+
+        <div id="user-register-page" class="page">
+            <button class="back-btn" onclick="showPage('user-login-page')">←</button>
+            <h2>Create an Account</h2>
+            <div class="input-group">
+                <label for="user-reg-name">Full Name</label>
+                <input type="text" id="user-reg-name" placeholder="Enter your full name" required>
+            </div>
+            <div class="input-group">
+                <label for="user-reg-phone">Phone Number</label>
+                <input type="tel" id="user-reg-phone" placeholder="Enter your phone number" required>
+            </div>
+            <div id="user-register-error" class="message"></div>
+            <button class="btn btn-primary" onclick="handleUserRegister()">Register</button>
+        </div>
+
+        <div id="user-address-page" class="page">
+            <button class="back-btn" onclick="showPage('user-login-page')">←</button>
+            <h2>Enter Home Address</h2>
+            <div class="input-group">
+                <label for="user-address">Home Address (Optional)</label>
+                <input type="text" id="user-address" placeholder="Enter your home address" oninput="checkAddressInput()">
+            </div>
+            <div id="address-error" class="message"></div>
+            <button class="btn btn-primary" id="next-btn" onclick="saveAddressAndProceed()" disabled>Next</button>
+            <button class="btn btn-secondary" onclick="showPage('user-booking-page')">Skip</button>
+        </div>
+
+        <div id="driver-login-page" class="page">
+            <button class="back-btn" onclick="showPage('login-page')">←</button>
+            <h2>Driver Login</h2>
+            <div class="input-group">
+                <label for="driver-userid">User ID</label>
+                <input type="text" id="driver-userid" placeholder="Enter User ID" required>
+            </div>
+            <div class="input-group">
+                <label for="driver-password">Password</label>
+                <input type="password" id="driver-password" placeholder="Enter password" required>
+            </div>
+            <div id="driver-error-message" class="message"></div>
+            <button class="btn btn-primary" onclick="handleDriverLogin(event)">Login</button>
+        </div>
+        
+        <div id="user-booking-page" class="page">
+            <button class="back-btn" onclick="showPage('user-address-page')">←</button>
+            <h2>Book a Ride</h2>
+            <div class="input-group">
+                <label for="vehicle-type">Vehicle Type</label>
+                <select id="vehicle-type">
+                    <option value="regular">Regular (4 seater)</option>
+                    <option value="jumbo">Jumbo (6 seater)</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="pickup-location">Pickup Location</label>
+                <input type="text" id="pickup-location" placeholder="e.g., T. Nagar, Chennai" required>
+            </div>
+            <div class="input-group">
+                <label for="drop-location">Drop Location</label>
+                <input type="text" id="drop-location" placeholder="e.g., Marina Beach, Chennai" required>
+            </div>
+            
+            <div id="booking-error-message" class="message"></div>
+            <button class="btn btn-primary" onclick="evaluatePrice(event)">Evaluate Price</button>
+            
+            <div id="price-section" class="info-section" style="display: none;">
+                <p><strong>Estimated Price:</strong> <span id="price-display"></span></p>
+                <p><strong>Est. Arrival:</strong> <span id="arrival-time-display"></span></p>
+                <p><strong>Est. Trip Time:</strong> <span id="trip-time-display"></span></p>
+                <button class="btn btn-primary" onclick="requestRide()">Book Ride</button>
+            </div>
+            
+            <div id="live-location-section" class="info-section" style="display: none;">
+                <div id="waiting-for-driver">
+                    <p><strong id="ride-status-message">Waiting for a driver to accept...</strong></p>
+                    <div class="loading-animation"></div>
+                    <button class="btn btn-secondary" onclick="cancelRide()">Cancel Ride Request</button>
+                </div>
+                <div id="driver-details-section" style="display: none;">
+                    <p><strong id="ride-accepted-message"></strong></p>
+                    <p><strong>Driver:</strong> <span id="driver-name-display"></span> (<span id="driver-vehicle-no-display"></span>)</p>
+                    <p><strong>Contact:</strong> <span id="driver-phone-display"></span></p>
+                    <div id="user-map" style="height: 250px; margin: 15px 0; border-radius: 12px;"></div>
+                    <button class="btn btn-secondary" id="toggle-route-btn" onclick="toggleUserMapView()" style="display: none; width: calc(50% - 5px); float: left;">Show Full Route</button>
+                    <button class="btn btn-secondary" onclick="cancelRide()" style="width: calc(50% - 5px); float: right;">Cancel Ride</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="driver-dashboard-page" class="page">
+            <button class="back-btn" onclick="showPage('driver-login-page')">←</button>
+            <div class="dashboard-header">
+                <h2>Dashboard</h2>
+                <div id="clock" class="clock"></div>
+            </div>
+            <div class="dashboard-grid">
+                <div>
+                    <h3>Completed Trips</h3>
+                    <div id="completed-trips-list" class="trip-list">
+                        <div class="trip-item" onclick="showDriverCompletedTripDetails('Marina Beach', 'Anna Nagar', '₹210')">Trip from Marina Beach (9:15 AM)</div>
+                    </div>
+                </div>
+                <div>
+                    <h3>Pending Trips</h3>
+                    <div id="pending-trips-list" class="trip-list">
+                        </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="driver-pending-trip-details-page" class="page">
+            <button class="back-btn" onclick="showPage('driver-dashboard-page')">←</button>
+            <h2>New Trip Request</h2>
+            <div class="info-section">
+                <p><strong>Pickup:</strong> <span id="pending-pickup"></span></p>
+                <p><strong>Drop:</strong> <span id="pending-drop"></span></p>
+                <p><strong>Price:</strong> <span id="pending-price"></span></p>
+            </div>
+            <div id="map" style="height: 300px; margin-top: 15px; border-radius: 12px; display:none;"></div>
+            
+            <p id="driver-trip-status" class="success-message"></p>
+
+            <div id="trip-action-buttons">
+                <button class="btn btn-primary" id="accept-btn" onclick="acceptTrip()">Accept</button>
+                <button class="btn btn-secondary" id="decline-btn" onclick="declineTrip()">Decline</button> 
+            </div>
+
+            <button class="btn btn-primary" id="picked-up-btn" onclick="handlePickedUp()" style="display: none;">Picked Up Customer</button>
+            <button class="btn btn-success" id="complete-trip-btn" onclick="completeTrip()" style="display: none;">Complete Trip</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        // --- Global Variables ---
+        let clockInterval;
+        let currentUserPhone = null; 
+        let currentDriverId = null; 
+        
+        let currentRideDetails = {};
+        let rideStatusInterval; 
+        let pendingTripCheckInterval; 
+        
+        let userMap, driverMap, userRouteLayer, driverRouteLayer;
+        let isShowingFullRoute = false;
+
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyC6KqinXb8FhqcI6uwEfl4h0EIvAkFNqfTrGxVkTPdnDpJxVFqmbFDdw4qxhv9oc5w/exec";
+        const BACKEND_API_URL = "http://127.0.0.1:5000";
+        
+        // --- Theme, Page, and Clock Functions ---
+        function toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            if (pageId === 'driver-dashboard-page' && currentDriverId) {
+                updateClock();
+                checkForPendingTrips(); 
+                pendingTripCheckInterval = setInterval(checkForPendingTrips, 10000); 
+            } else {
+                if (clockInterval) clearInterval(clockInterval);
+                if (pendingTripCheckInterval) clearInterval(pendingTripCheckInterval);
+            }
+        }
+        function updateClock() { const clockElement = document.getElementById('clock'); if (!clockElement) return; if (clockInterval) clearInterval(clockInterval); const update = () => { clockElement.textContent = new Date().toLocaleTimeString('en-IN', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: true }); }; update(); clockInterval = setInterval(update, 1000); }
+
+        // --- User Login and Registration Flow ---
+        async function handleUserLogin(event) {
+            const phoneNumber = document.getElementById('user-phone').value;
+            const errorMessage = document.getElementById('user-login-error');
+            const loginButton = event.target;
+            if (!phoneNumber) { errorMessage.textContent = 'Please enter your phone number.'; return; }
+            loginButton.disabled = true; loginButton.textContent = 'Logging in...'; errorMessage.textContent = '';
+            try {
+                const response = await fetch(`${SCRIPT_URL}?phone=${phoneNumber}`);
+                const result = await response.json();
+                if (result.status === "success") {
+                    if (result.exists) {
+                        currentUserPhone = phoneNumber;
+                        showPage(result.address ? 'user-booking-page' : 'user-address-page');
+                    } else { errorMessage.textContent = 'Phone number not found. Please register.'; }
+                } else { errorMessage.textContent = 'An error occurred: ' + result.message; }
+            } catch (error) {
+                errorMessage.textContent = 'Failed to connect. Please check your connection.';
+            } finally {
+                loginButton.disabled = false; loginButton.textContent = 'Login';
+            }
+        }
+        function goToRegisterPage() { document.getElementById('user-reg-phone').value = document.getElementById('user-phone').value; showPage('user-register-page'); }
+        async function handleUserRegister() {
+            const name = document.getElementById('user-reg-name').value;
+            const phone = document.getElementById('user-reg-phone').value;
+            await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ name, phone }) });
+            currentUserPhone = phone;
+            showPage('user-address-page');
+        }
+        async function saveAddressAndProceed() {
+             await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ phone: currentUserPhone, address: document.getElementById('user-address').value }) });
+             showPage('user-booking-page');
+        }
+        function checkAddressInput() { document.getElementById('next-btn').disabled = document.getElementById('user-address').value.trim() === ''; }
+
+        // --- Driver Login Flow ---
+        async function handleDriverLogin(event) {
+            const userId = document.getElementById('driver-userid').value;
+            const password = document.getElementById('driver-password').value;
+            const errorMessage = document.getElementById('driver-error-message');
+            const loginButton = event.target;
+            if (!userId || !password) { errorMessage.textContent = 'Please enter both User ID and Password.'; return; }
+            loginButton.disabled = true; loginButton.textContent = 'Logging in...'; errorMessage.textContent = '';
+            try {
+                const response = await fetch(`${SCRIPT_URL}?driverId=${encodeURIComponent(userId)}&password=${encodeURIComponent(password)}`);
+                const result = await response.json();
+                if (result.status === "success" && result.authenticated) {
+                    currentDriverId = userId;
+                    errorMessage.textContent = '';
+                    showPage('driver-dashboard-page');
+                } else { errorMessage.textContent = 'Invalid User ID or Password.'; }
+            } catch (error) {
+                errorMessage.textContent = 'Login failed. Please check your connection.';
+            } finally {
+                loginButton.disabled = false; loginButton.textContent = 'Login';
+            }
+        }
+
+        // --- User-Side Ride Flow ---
+        async function evaluatePrice(event) {
+            const priceButton = event.target;
+            priceButton.disabled = true; priceButton.textContent = 'Evaluating...';
+            try {
+                const response = await fetch(`${BACKEND_API_URL}/evaluate-price`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        pickup: document.getElementById('pickup-location').value, 
+                        drop: document.getElementById('drop-location').value, 
+                        vehicle_type: document.getElementById('vehicle-type').value 
+                    })
+                });
+                const result = await response.json();
+                if (result.error) throw new Error(result.error);
+                
+                document.getElementById('price-display').textContent = `₹${result.price}`;
+                document.getElementById('arrival-time-display').textContent = `${result.arrival_time} mins`;
+                document.getElementById('trip-time-display').textContent = `${result.trip_time} mins`;
+                document.getElementById('price-section').style.display = 'block';
+            } catch (error) {
+                document.getElementById('booking-error-message').textContent = error.message;
+            } finally {
+                priceButton.disabled = false; priceButton.textContent = 'Evaluate Price';
+            }
+        }
+        async function requestRide() {
+            document.getElementById('price-section').style.display = 'none';
+            document.getElementById('live-location-section').style.display = 'block';
+            document.getElementById('waiting-for-driver').style.display = 'block';
+            document.getElementById('driver-details-section').style.display = 'none';
+            try {
+                const response = await fetch(`${BACKEND_API_URL}/request-ride`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pickup: document.getElementById('pickup-location').value,
+                        drop: document.getElementById('drop-location').value,
+                        vehicle_type: document.getElementById('vehicle-type').value
+                    })
+                });
+                const result = await response.json();
+                if (result.error) throw new Error(result.error);
+                startPollingRideStatus(result.ride_id);
+            } catch (error) {
+                document.getElementById('ride-status-message').textContent = `Error: ${error.message}`;
+            }
+        }
+        function startPollingRideStatus(rideId) {
+            rideStatusInterval = setInterval(async () => {
+                const response = await fetch(`${BACKEND_API_URL}/check-ride-status/${rideId}`);
+                const result = await response.json();
+                
+                if (result.status === 'accepted') {
+                    clearInterval(rideStatusInterval);
+                    currentRideDetails = result.ride_details;
+                    document.getElementById('waiting-for-driver').style.display = 'none';
+                    document.getElementById('driver-details-section').style.display = 'block';
+                    document.getElementById('ride-accepted-message').textContent = `Driver ${currentRideDetails.driver_name} accepted!`;
+                    document.getElementById('driver-name-display').textContent = currentRideDetails.driver_name;
+                    document.getElementById('driver-vehicle-no-display').textContent = currentRideDetails.driver_vehicle_no;
+                    document.getElementById('driver-phone-display').textContent = currentRideDetails.driver_phone;
+                    document.getElementById('toggle-route-btn').style.display = 'block';
+                    initializeUserMap();
+                }
+            }, 5000); 
+        }
+        function cancelRide() {
+            clearInterval(rideStatusInterval);
+            document.getElementById('live-location-section').style.display = 'none';
+            showPage('user-booking-page');
+        }
+
+        // --- Driver-Side Ride Flow ---
+        async function checkForPendingTrips() {
+            if (!currentDriverId) return;
+            const response = await fetch(`${BACKEND_API_URL}/get-pending-trips/${currentDriverId}`);
+            const result = await response.json();
+            const tripList = document.getElementById('pending-trips-list');
+            if (result.trip && tripList.children.length === 0) {
+                currentRideDetails = result.trip;
+                const tripItem = document.createElement('div');
+                tripItem.className = 'trip-item';
+                tripItem.textContent = `New trip from ${result.trip.pickup_location}`;
+                tripItem.onclick = viewPendingTrip;
+                tripList.innerHTML = '';
+                tripList.appendChild(tripItem);
+            }
+        }
+        function viewPendingTrip() {
+            showPage('driver-pending-trip-details-page');
+            document.getElementById('pending-pickup').textContent = currentRideDetails.pickup_location;
+            document.getElementById('pending-drop').textContent = currentRideDetails.drop_location;
+            document.getElementById('pending-price').textContent = `₹${currentRideDetails.price}`;
+            // Reset button visibility when viewing a new trip
+            document.getElementById('trip-action-buttons').style.display = 'block';
+            document.getElementById('picked-up-btn').style.display = 'none';
+            document.getElementById('complete-trip-btn').style.display = 'none';
+            document.getElementById('driver-trip-status').textContent = '';
+        }
+
+        // --- MODIFIED: acceptTrip function ---
+        async function acceptTrip() {
+            await fetch(`${BACKEND_API_URL}/accept-ride`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    driver_id: currentDriverId,
+                    ride_id: currentRideDetails.ride_id
+                })
+            });
+            document.getElementById('trip-action-buttons').style.display = 'none';
+            document.getElementById('picked-up-btn').style.display = 'block';
+            document.getElementById('driver-trip-status').textContent = 'Accepted! Please proceed to pickup location.';
+            document.getElementById('map').style.display = 'block';
+            initializeDriverMap(currentRideDetails.driver_to_customer.route_coords);
+        }
+        
+        // --- START: Logic for the "Picked Up" button ---
+        function handlePickedUp() {
+            // Hide the "Picked Up" button, as the pickup is complete.
+            document.getElementById('picked-up-btn').style.display = 'none';
+            // Show the "Complete Trip" button for the next step.
+            document.getElementById('complete-trip-btn').style.display = 'block';
+
+            // Update the status message for the driver.
+            document.getElementById('driver-trip-status').textContent = 'Customer picked up. Proceed to destination.';
+
+            // As requested, this is where the map is updated.
+            // It now shows the route from the customer's pickup location to the drop-off location.
+            // The new route coordinates are pulled from the `currentRideDetails` object.
+            if (driverMap && currentRideDetails && currentRideDetails.customer_to_destination) {
+                drawRoute(driverMap, currentRideDetails.customer_to_destination.route_coords, driverRouteLayer);
+            }
+        }
+        // --- END: Logic for the "Picked Up" button ---
+        
+        // --- MODIFIED: New completeTrip function ---
+        function completeTrip() {
+            // In a real app, you would notify the backend
+            const { pickup_location, price } = currentRideDetails;
+            const completedList = document.getElementById('completed-trips-list');
+            const newItem = document.createElement('div');
+            newItem.className = 'trip-item';
+            newItem.textContent = `Trip from ${pickup_location} (₹${price}) - ${new Date().toLocaleTimeString('en-IN')}`;
+            completedList.prepend(newItem);
+            
+            document.getElementById('pending-trips-list').innerHTML = '';
+            showPage('driver-dashboard-page');
+        }
+
+        function declineTrip() {
+            document.getElementById('pending-trips-list').innerHTML = '';
+            showPage('driver-dashboard-page');
+        }
+        function showDriverCompletedTripDetails(pickup, drop, cost) {
+            alert(`Trip from ${pickup} to ${drop} for ${cost}`);
+        }
+
+        // --- Map and Utility Functions ---
+        function drawRoute(mapInstance, routeCoords, layerGroup) {
+            if (!mapInstance || !routeCoords) return;
+            layerGroup.clearLayers();
+            const polyline = L.polyline(routeCoords, { color: 'var(--primary-color)', weight: 5 });
+            layerGroup.addLayer(polyline);
+            mapInstance.fitBounds(polyline.getBounds().pad(0.1));
+        }
+        function initializeUserMap() {
+            if (!userMap) {
+                userMap = L.map('user-map');
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(userMap);
+                userRouteLayer = L.layerGroup().addTo(userMap);
+            }
+            drawRoute(userMap, currentRideDetails.driver_to_customer.route_coords, userRouteLayer);
+        }
+        function initializeDriverMap(route) {
+            if (!driverMap) {
+                driverMap = L.map('map');
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(driverMap);
+                driverRouteLayer = L.layerGroup().addTo(driverMap);
+            }
+            drawRoute(driverMap, route, driverRouteLayer);
+        }
+        function toggleUserMapView() {
+            isShowingFullRoute = !isShowingFullRoute;
+            const route = isShowingFullRoute ? currentRideDetails.customer_to_destination.route_coords : currentRideDetails.driver_to_customer.route_coords;
+            drawRoute(userMap, route, userRouteLayer);
+            document.getElementById('toggle-route-btn').textContent = isShowingFullRoute ? 'Show Driver Route' : 'Show Full Route';
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                if (document.getElementById('theme-toggle')) {
+                    document.getElementById('theme-toggle').checked = true;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
